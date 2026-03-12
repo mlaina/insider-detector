@@ -76,12 +76,12 @@
     <!-- Scoring -->
     <div>
       <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Como calcula el score de sospecha (0-100)</h3>
-      <p class="text-xs text-slate-500 mb-3">Cada contrato que pasa los filtros recibe un score basado en 6 senales. Cada senal se normaliza a 0-100 y se multiplica por su peso:</p>
+      <p class="text-xs text-slate-500 mb-3">Cada contrato que pasa los filtros recibe un score basado en 8 senales. Cada senal se normaliza a 0-100 y se multiplica por su peso:</p>
       <div class="space-y-2">
         <!-- Signal 1 -->
         <div class="glass rounded-lg p-4">
           <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">25%</span>
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">20%</span>
             <span class="text-sm font-semibold text-white">Volumen vs baseline del ticker</span>
           </div>
           <p class="text-xs text-slate-400 mb-2">Estima cuanto volumen de opciones es "normal" para esa empresa usando el Open Interest total como proxy (vol normal ~ 10% del OI). Si hoy se negocian 5x mas de lo normal, algo pasa.</p>
@@ -93,7 +93,7 @@
         <!-- Signal 2 -->
         <div class="glass rounded-lg p-4">
           <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">20%</span>
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">15%</span>
             <span class="text-sm font-semibold text-white">Vol/OI ratio — Posiciones nuevas</span>
           </div>
           <p class="text-xs text-slate-400 mb-2">Cuando el volumen de un contrato especifico supera ampliamente su Open Interest, significa que son <strong class="text-white">posiciones nuevas</strong>, no gente rolleando o cerrando. Es la firma clasica de smart money entrando.</p>
@@ -105,7 +105,7 @@
         <!-- Signal 3 -->
         <div class="glass rounded-lg p-4">
           <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">20%</span>
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">15%</span>
             <span class="text-sm font-semibold text-white">Notional — Tamano de la apuesta en $</span>
           </div>
           <p class="text-xs text-slate-400 mb-2">Volumen x precio del contrato x 100 (multiplicador de opciones). Apuestas grandes implican conviccion o informacion. Un retail trader no mete $500K en una call OTM.</p>
@@ -114,10 +114,28 @@
             <div class="text-slate-300">$50K = minimo para alertar | $500K = senal fuerte | <strong class="text-red-400">$2M+ = score maximo</strong></div>
           </div>
         </div>
-        <!-- Signal 4 -->
+        <!-- Signal 4 — Directional Flow (NEW) -->
         <div class="glass rounded-lg p-4">
           <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">15%</span>
+            <span class="text-xs font-bold text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded">12%</span>
+            <span class="text-sm font-semibold text-white">Flujo direccional — Calls vs Puts</span>
+            <span class="text-[10px] text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded">NUEVO</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Analiza el <strong class="text-white">ratio de volumen entre calls y puts</strong> para cada expiracion. Cuando el 85%+ del volumen va en una sola direccion (ej: casi todo calls), indica <strong class="text-white">conviccion extrema</strong> de que el precio subira (o bajara si es puts). Es la firma de alguien que opera con informacion.</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs">
+            <div class="text-slate-500 mb-1">Ejemplo:</div>
+            <div class="text-slate-300">SPXS exp 2026-03-06: calls_volume=1,719, puts_volume=291. Eso es <strong class="text-cyan-400">85.5% flujo ALCISTA</strong> — casi todo el volumen son calls. Score parcial: 100/100.</div>
+          </div>
+          <div class="flex gap-2 mt-2 text-[11px]">
+            <span class="px-2 py-1 rounded bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">&ge; 85% &rarr; 100 pts (extremo)</span>
+            <span class="px-2 py-1 rounded bg-cyan-500/10 text-cyan-400/70 border border-cyan-500/15">&ge; 75% &rarr; 70 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-500/15 text-slate-400 border border-slate-500/20">&ge; 60% &rarr; 30 pts</span>
+          </div>
+        </div>
+        <!-- Signal 5 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">12%</span>
             <span class="text-sm font-semibold text-white">Expiracion cercana — Maximo apalancamiento</span>
           </div>
           <p class="text-xs text-slate-400 mb-2">Calls near-term son baratas pero ofrecen maximo apalancamiento. Si alguien compra calls agresivas que expiran en 3 dias, esta apostando a un <strong class="text-white">movimiento inminente</strong>. Es la senal mas asociada a insider trading pre-evento.</p>
@@ -128,10 +146,23 @@
             <span class="px-2 py-1 rounded bg-slate-700/50 text-slate-500 border border-slate-700/30">&le; 30 dias &rarr; 25 pts</span>
           </div>
         </div>
-        <!-- Signal 5 -->
+        <!-- Signal 6 — OI Concentration (NEW) -->
         <div class="glass rounded-lg p-4">
           <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">10%</span>
+            <span class="text-xs font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">10%</span>
+            <span class="text-sm font-semibold text-white">Concentracion de OI — Posiciones acumuladas</span>
+            <span class="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">NUEVO</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Detecta cuando el <strong class="text-white">Open Interest se concentra anormalmente en un solo contrato</strong> (strike + expiracion). Si un contrato tiene el 20%+ del OI total del ticker con mas de 1,000 contratos, sugiere que alguien acumulo una posicion grande de forma deliberada.</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs">
+            <div class="text-slate-500 mb-1">Ejemplo:</div>
+            <div class="text-slate-300">AUPH tiene 6,804 contratos de OI concentrados en un solo strike — eso es <strong class="text-amber-400">concentracion anormal</strong> que indica acumulacion deliberada.</div>
+          </div>
+        </div>
+        <!-- Signal 7 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">8%</span>
             <span class="text-sm font-semibold text-white">Profundidad OTM — Apuesta direccional</span>
           </div>
           <p class="text-xs text-slate-400 mb-2">Calls muy fuera del dinero (10%+ por encima del spot) con volumen alto solo tienen sentido si esperas un movimiento grande. Es una apuesta extremadamente direccional.</p>
@@ -142,10 +173,10 @@
             <span class="px-2 py-1 rounded bg-slate-700/50 text-slate-500 border border-slate-700/30">ATM &rarr; 10 pts</span>
           </div>
         </div>
-        <!-- Signal 6 -->
+        <!-- Signal 8 -->
         <div class="glass rounded-lg p-4">
           <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">10%</span>
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">8%</span>
             <span class="text-sm font-semibold text-white">Clustering — Patron, no casualidad</span>
           </div>
           <p class="text-xs text-slate-400 mb-2">Multiples contratos inusuales en el mismo ticker (distintos strikes o expiraciones) sugieren que alguien esta distribuyendo una apuesta grande para ser menos visible.</p>
@@ -229,17 +260,19 @@
               <th class="px-3 py-1.5 text-right">Aporte</th>
             </tr></thead>
             <tbody class="text-slate-300">
-              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Vol vs baseline</td><td class="px-3 py-1.5 text-right text-red-400">8x</td><td class="px-3 py-1.5 text-right">80</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.25</td><td class="px-3 py-1.5 text-right font-bold">20.0</td></tr>
-              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Vol/OI</td><td class="px-3 py-1.5 text-right text-red-400">25x</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.20</td><td class="px-3 py-1.5 text-right font-bold">20.0</td></tr>
-              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Notional</td><td class="px-3 py-1.5 text-right text-indigo-300">$800K</td><td class="px-3 py-1.5 text-right">40</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.20</td><td class="px-3 py-1.5 text-right font-bold">8.0</td></tr>
-              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Expiracion</td><td class="px-3 py-1.5 text-right text-red-400">4 dias</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.15</td><td class="px-3 py-1.5 text-right font-bold">15.0</td></tr>
-              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">OTM depth</td><td class="px-3 py-1.5 text-right text-amber-400">15%</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.10</td><td class="px-3 py-1.5 text-right font-bold">10.0</td></tr>
-              <tr><td class="px-3 py-1.5">Clustering</td><td class="px-3 py-1.5 text-right text-amber-400">5</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.10</td><td class="px-3 py-1.5 text-right font-bold">10.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Vol vs baseline</td><td class="px-3 py-1.5 text-right text-red-400">8x</td><td class="px-3 py-1.5 text-right">80</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.20</td><td class="px-3 py-1.5 text-right font-bold">16.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Vol/OI</td><td class="px-3 py-1.5 text-right text-red-400">25x</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.15</td><td class="px-3 py-1.5 text-right font-bold">15.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Notional</td><td class="px-3 py-1.5 text-right text-indigo-300">$800K</td><td class="px-3 py-1.5 text-right">40</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.15</td><td class="px-3 py-1.5 text-right font-bold">6.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Flujo direccional</td><td class="px-3 py-1.5 text-right text-cyan-400">ALCISTA 92%</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.12</td><td class="px-3 py-1.5 text-right font-bold">12.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Expiracion</td><td class="px-3 py-1.5 text-right text-red-400">4 dias</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.12</td><td class="px-3 py-1.5 text-right font-bold">12.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Concentracion OI</td><td class="px-3 py-1.5 text-right text-amber-400">35%</td><td class="px-3 py-1.5 text-right">70</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.10</td><td class="px-3 py-1.5 text-right font-bold">7.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">OTM depth</td><td class="px-3 py-1.5 text-right text-amber-400">15%</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.08</td><td class="px-3 py-1.5 text-right font-bold">8.0</td></tr>
+              <tr><td class="px-3 py-1.5">Clustering</td><td class="px-3 py-1.5 text-right text-amber-400">5</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.08</td><td class="px-3 py-1.5 text-right font-bold">8.0</td></tr>
             </tbody>
-            <tfoot><tr class="border-t border-indigo-500/30"><td colspan="4" class="px-3 py-2 text-right font-semibold text-white">SCORE TOTAL</td><td class="px-3 py-2 text-right text-lg font-bold text-red-400">83</td></tr></tfoot>
+            <tfoot><tr class="border-t border-indigo-500/30"><td colspan="4" class="px-3 py-2 text-right font-semibold text-white">SCORE TOTAL</td><td class="px-3 py-2 text-right text-lg font-bold text-red-400">84</td></tr></tfoot>
           </table>
         </div>
-        <p class="text-xs text-slate-500">Score 83 &rarr; <span class="text-red-400 font-semibold">ALTA SOSPECHA</span>. Alguien aposto $800K en calls 15% OTM que expiran en 4 dias, con un volumen 25x superior al OI existente y 8x sobre la media del ticker. No es actividad normal.</p>
+        <p class="text-xs text-slate-500">Score 84 &rarr; <span class="text-red-400 font-semibold">ALTA SOSPECHA</span>. Alguien aposto $800K en calls 15% OTM que expiran en 4 dias, con un volumen 25x superior al OI existente, 8x sobre la media del ticker, y flujo 92% alcista. No es actividad normal.</p>
       </div>
     </div>
 

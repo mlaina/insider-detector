@@ -22,6 +22,8 @@
     .badge-reddit { background: rgba(255,69,0,0.15); color: #ff8a65; border: 1px solid rgba(255,69,0,0.3); }
     .badge-earnings { background: rgba(168,85,247,0.15); color: #c4b5fd; border: 1px solid rgba(168,85,247,0.3); }
     .badge-genuine { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+    .badge-flow { background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3); }
+    .badge-oi { background: rgba(251,191,36,0.15); color: #fde68a; border: 1px solid rgba(251,191,36,0.3); }
     input, select { background: rgba(10,10,26,0.9); border: 1px solid rgba(99,102,241,0.25); color: #e2e8f0; }
     input:focus, select:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,0.15); }
     .progress-bar { transition: width 0.3s ease; }
@@ -166,6 +168,7 @@
                 <th class="px-3 py-2 text-right">OI</th>
                 <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('vol_oi_ratio')">V/OI</th>
                 <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('vol_vs_baseline')">vs Media</th>
+                <th class="px-3 py-2 text-center cursor-pointer hover:text-white" onclick="sortBy('dominant_pct')">Flow</th>
                 <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('implied_vol')">IV%</th>
                 <th class="px-3 py-2 text-left">Razon</th>
               </tr>
@@ -421,6 +424,19 @@
           contextBadges += `<span class="px-2 py-0.5 rounded text-[10px] ${urgency} badge-earnings">Earnings ${ed} (${dd}d)</span>`;
         }
         if (!ctx.tags?.length && ctx.reddit_mentions === 0 && !ctx.has_earnings) contextBadges += '<span class="px-2 py-0.5 rounded text-[10px] font-semibold badge-genuine">Sin ruido publico</span>';
+
+        // Directional flow badge from top alert
+        const topAlert = ins.alerts.sort((a,b) => (b.score||0) - (a.score||0))[0] || {};
+        const tickerDp = topAlert.ticker_dominant_pct || 0;
+        const tickerDir = topAlert.ticker_flow_direction || '';
+        if (tickerDp >= 85) contextBadges += `<span class="px-2 py-0.5 rounded text-[10px] font-semibold badge-flow">Flujo ${tickerDir} extremo ${tickerDp.toFixed(0)}%</span>`;
+        else if (tickerDp >= 75) contextBadges += `<span class="px-2 py-0.5 rounded text-[10px] badge-flow">Flujo ${tickerDir} ${tickerDp.toFixed(0)}%</span>`;
+
+        // OI concentration badge
+        const oiConc = topAlert.oi_concentration || 0;
+        const maxOi = topAlert.max_oi_contract || 0;
+        if (oiConc >= 20 && maxOi >= 1000) contextBadges += `<span class="px-2 py-0.5 rounded text-[10px] badge-oi">OI concentrado ${oiConc.toFixed(0)}%</span>`;
+
         const rawScore = ins.raw_max_score || ins.max_score;
         const penaltyInfo = ctx.penalty > 0 ? `<span class="text-[10px] text-slate-600 ml-1">(raw: ${rawScore.toFixed(0)}, -${ctx.penalty}pts contexto)</span>` : '';
 
@@ -435,8 +451,14 @@
           const strikes = alerts.map(a => `$${a.strike}`).join(', ');
           const totalVol = alerts.reduce((s,a) => s+a.volume, 0);
           const totalNot = alerts.reduce((s,a) => s+a.notional, 0);
-          const topReason = alerts.sort((a,b) => b.score - a.score)[0].reason;
+          const topA = alerts.sort((a,b) => b.score - a.score)[0];
+          const topReason = topA.reason;
           const dte = alerts[0].dte;
+          const dp = topA.dominant_pct || 0;
+          const dir = topA.flow_direction || '';
+          const callsV = topA.calls_volume || 0;
+          const putsV = topA.puts_volume || 0;
+          const flowHtml = dp >= 75 ? `<div class="text-[10px] ${dp >= 85 ? 'text-cyan-400 font-bold' : 'text-cyan-400/70'}">${dir} ${dp.toFixed(0)}% (C:${callsV.toLocaleString()} P:${putsV.toLocaleString()})</div>` : '';
           return `<div class="flex items-start gap-4 text-xs py-2 border-t border-slate-800/30">
             <div class="min-w-[140px]">
               <div class="text-indigo-400 font-mono">${exp}</div>
@@ -453,6 +475,7 @@
             <div class="min-w-[80px]">
               <div class="text-[10px] text-slate-500 uppercase">Volumen</div>
               <div class="text-emerald-400">${totalVol.toLocaleString()}</div>
+              ${flowHtml}
             </div>
             <div class="flex-1">
               <div class="text-[10px] text-slate-500 uppercase">Senal</div>
@@ -523,6 +546,11 @@
           <td class="px-3 py-2 text-right text-slate-500">${a.open_interest.toLocaleString()}</td>
           <td class="px-3 py-2 text-right ${a.vol_oi_ratio >= 5 ? 'text-red-400 font-bold' : ''}">${a.vol_oi_ratio.toFixed(1)}x</td>
           <td class="px-3 py-2 text-right ${vbClass}">${a.vol_vs_baseline > 0 ? a.vol_vs_baseline.toFixed(1)+'x' : '-'}</td>
+          <td class="px-3 py-2 text-center">
+            ${a.dominant_pct >= 85 ? `<span class="text-cyan-400 font-bold text-[10px]">${a.flow_direction} ${a.dominant_pct.toFixed(0)}%</span>` :
+              a.dominant_pct >= 75 ? `<span class="text-cyan-400/70 text-[10px]">${a.flow_direction} ${a.dominant_pct.toFixed(0)}%</span>` :
+              `<span class="text-slate-600 text-[10px]">${(a.dominant_pct||0).toFixed(0)}%</span>`}
+          </td>
           <td class="px-3 py-2 text-right">${a.implied_vol.toFixed(0)}%</td>
           <td class="px-3 py-2 text-slate-500 max-w-[300px] truncate" title="${a.reason}">${a.reason}</td>
         </tr>`;
@@ -626,6 +654,52 @@
           </div>`;
       }
 
+      // Directional flow section for modal
+      const tDp = top.ticker_dominant_pct || 0;
+      const tDir = top.ticker_flow_direction || '';
+      const tCallsVol = top.ticker_calls_vol || 0;
+      const tPutsVol = top.ticker_puts_vol || 0;
+      let flowSection = '';
+      if (tDp >= 60) {
+        const flowColor = tDp >= 85 ? 'text-cyan-400 font-bold' : tDp >= 75 ? 'text-cyan-400' : 'text-slate-300';
+        const barWidth = Math.round(tDp);
+        const callsPct = tCallsVol + tPutsVol > 0 ? Math.round(tCallsVol / (tCallsVol + tPutsVol) * 100) : 50;
+        flowSection = `
+          <h4 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2 mt-4">Flujo direccional</h4>
+          <div class="p-3 rounded bg-cyan-500/5 border border-cyan-500/15 mb-2">
+            <div class="flex items-center gap-3 mb-2">
+              <span class="${flowColor} text-sm">Flujo ${tDir}: ${tDp.toFixed(1)}%</span>
+              <span class="text-xs text-slate-500">Calls: ${tCallsVol.toLocaleString()} | Puts: ${tPutsVol.toLocaleString()}</span>
+            </div>
+            <div class="flex h-2 rounded-full overflow-hidden bg-slate-800">
+              <div class="bg-emerald-500/70 h-full" style="width:${callsPct}%"></div>
+              <div class="bg-red-500/70 h-full" style="width:${100-callsPct}%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-slate-600 mt-1">
+              <span>Calls ${callsPct}%</span>
+              <span>Puts ${100-callsPct}%</span>
+            </div>
+          </div>`;
+      }
+
+      // OI concentration section for modal
+      const oiConc = top.oi_concentration || 0;
+      const maxOi = top.max_oi_contract || 0;
+      const totalOi = top.ticker_total_oi || 0;
+      let oiSection = '';
+      if (oiConc >= 20 && maxOi >= 1000) {
+        oiSection = `
+          <div class="p-3 rounded bg-amber-500/5 border border-amber-500/15 mb-2">
+            <div class="flex items-center gap-3">
+              <span class="text-amber-400 font-semibold text-sm">${oiConc.toFixed(0)}%</span>
+              <div>
+                <div class="text-xs text-white">OI concentrado: ${maxOi.toLocaleString()} contratos en un solo strike</div>
+                <div class="text-[10px] text-slate-500">Total OI del ticker: ${totalOi.toLocaleString()} — concentracion inusual</div>
+              </div>
+            </div>
+          </div>`;
+      }
+
       const content = document.getElementById('modalContent');
       content.innerHTML = `
         <div class="mb-4">
@@ -637,6 +711,8 @@
           <div class="text-xs text-slate-500">${alerts.length} contratos inusuales | Notional total: <strong class="text-indigo-300">${fmtMoney(totalNotional)}</strong></div>
           <div class="text-[10px] text-slate-600 mt-1">Escaneado: ${top.data_timestamp || top.scanned_at || ''}</div>
         </div>
+        ${flowSection}
+        ${oiSection}
         ${contextSection}
 
         <h4 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2 mt-6">Desglose del score — Contrato con mayor sospecha (Score ${top.score.toFixed(0)})</h4>
@@ -652,12 +728,14 @@
             <th class="px-3 py-1.5 text-right">Aporte</th>
           </tr></thead>
           <tbody class="text-slate-300">
-            ${scoreRow('Vol vs baseline', top.vol_vs_baseline > 0 ? top.vol_vs_baseline.toFixed(1)+'x' : '-', calcSignalPts('baseline', top), 0.25)}
-            ${scoreRow('Vol/OI (posiciones nuevas)', top.vol_oi_ratio.toFixed(1)+'x', calcSignalPts('voloi', top), 0.20)}
-            ${scoreRow('Notional', fmtMoney(top.notional), calcSignalPts('notional', top), 0.20)}
-            ${scoreRow('Expiracion', top.dte + ' dias', calcSignalPts('dte', top), 0.15)}
-            ${scoreRow('Profundidad OTM', top.otm_pct.toFixed(1)+'%', calcSignalPts('otm', top), 0.10)}
-            ${scoreRow('Clustering', top.cluster_count || alerts.length, calcSignalPts('cluster', top, alerts.length), 0.10)}
+            ${scoreRow('Vol vs baseline', top.vol_vs_baseline > 0 ? top.vol_vs_baseline.toFixed(1)+'x' : '-', calcSignalPts('baseline', top), 0.20)}
+            ${scoreRow('Vol/OI (posiciones nuevas)', top.vol_oi_ratio.toFixed(1)+'x', calcSignalPts('voloi', top), 0.15)}
+            ${scoreRow('Notional', fmtMoney(top.notional), calcSignalPts('notional', top), 0.15)}
+            ${scoreRow('Flujo direccional', (top.flow_direction||'')+' '+(top.dominant_pct||0).toFixed(0)+'%', calcSignalPts('flow', top), 0.12)}
+            ${scoreRow('Expiracion', top.dte + ' dias', calcSignalPts('dte', top), 0.12)}
+            ${scoreRow('Concentracion OI', (top.oi_concentration||0).toFixed(0)+'% ('+((top.max_oi_contract||0)).toLocaleString()+' contratos)', calcSignalPts('oi_conc', top), 0.10)}
+            ${scoreRow('Profundidad OTM', top.otm_pct.toFixed(1)+'%', calcSignalPts('otm', top), 0.08)}
+            ${scoreRow('Clustering', top.cluster_count || alerts.length, calcSignalPts('cluster', top, alerts.length), 0.08)}
           </tbody>
           <tfoot><tr class="border-t border-indigo-500/30"><td colspan="4" class="px-3 py-2 text-right font-semibold text-white">SCORE TOTAL</td><td class="px-3 py-2 text-right text-lg font-bold ${top.score >= 75 ? 'score-high' : 'score-med'}">${top.score.toFixed(1)}</td></tr></tfoot>
         </table>
@@ -710,9 +788,19 @@
           if (n < 50000) return 0;
           return Math.min(100, Math.round((n / 2000000) * 100));
         }
+        case 'flow': {
+          const dp = a.dominant_pct || 0;
+          if (dp >= 85) return 100; if (dp >= 75) return 70; if (dp >= 60) return 30; return 0;
+        }
         case 'dte': {
           const d = a.dte;
           if (d <= 5) return 100; if (d <= 10) return 80; if (d <= 21) return 50; if (d <= 30) return 25; return 10;
+        }
+        case 'oi_conc': {
+          const oc = a.oi_concentration || 0;
+          const moi = a.max_oi_contract || 0;
+          if (oc < 20 || moi < 1000) return 0;
+          return Math.min(100, Math.round((oc / 50) * 100));
         }
         case 'otm': {
           const o = a.otm_pct;

@@ -35,18 +35,26 @@ scans/          → Saved scan results as JSON (gitignored)
 
 ## Scoring (0-100)
 
-Six weighted signals (weights sum to 1.0):
+Eight weighted signals (weights sum to 1.0):
 
 | Signal | Weight | What it measures |
 |--------|--------|-----------------|
-| Vol vs baseline | 0.25 | Today's volume vs estimated daily normal (OI × 10%) |
-| Vol/OI ratio | 0.20 | New positions — high ratio = fresh money entering |
-| Notional ($) | 0.20 | Size of bet in dollars (vol × price × 100) |
-| Near expiry | 0.15 | DTE — shorter = more leveraged = more suspicious |
-| OTM depth | 0.10 | How far out of the money — deep OTM + volume = directional bet |
-| Clustering | 0.10 | Multiple unusual contracts on same ticker |
+| Vol vs baseline | 0.20 | Today's volume vs estimated daily normal (OI × 10%) |
+| Vol/OI ratio | 0.15 | New positions — high ratio = fresh money entering |
+| Notional ($) | 0.15 | Size of bet in dollars (vol × price × 100) |
+| Directional flow | 0.12 | Call/put volume ratio — extreme one-directional flow = conviction |
+| Near expiry | 0.12 | DTE — shorter = more leveraged = more suspicious |
+| OI concentration | 0.10 | Abnormal OI concentrated in a single contract |
+| OTM depth | 0.08 | How far out of the money — deep OTM + volume = directional bet |
+| Clustering | 0.08 | Multiple unusual contracts on same ticker |
 
 Each signal normalized to 0-100, multiplied by weight, summed. See `scanner.py:_score()`.
+
+### Directional flow
+Scanner fetches both calls AND puts for each expiration. Calculates the percentage of volume in the dominant direction. 85%+ calls = extreme bullish flow, 85%+ puts = extreme bearish flow. This signal is what other tools call "EXTREME DIRECTIONAL FLOW".
+
+### OI concentration
+Detects when a single contract holds 20%+ of the ticker's total OI with at least 1,000 contracts. This indicates deliberate accumulation in a specific strike/expiration.
 
 ## Context system (context.py)
 

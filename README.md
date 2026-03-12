@@ -57,16 +57,18 @@ python main.py --threshold 60           # Higher threshold
 
 ## How scoring works
 
-Each call option contract passing filters (min volume 100, DTE 1-45, OTM ≤ 30%) is scored on 6 signals:
+Each call option contract passing filters (min volume 100, DTE 1-45, OTM ≤ 30%) is scored on 8 signals:
 
 | Signal | Weight | Description |
 |--------|--------|-------------|
-| Volume vs baseline | 25% | Today's volume vs estimated daily normal (OI × 10%) |
-| Vol/OI ratio | 20% | New positions entering — high ratio = fresh money |
-| Notional | 20% | Size of bet in $ (volume × premium × 100) |
-| Near expiry | 15% | Shorter DTE = more leverage = more suspicious |
-| OTM depth | 10% | Deep out-of-the-money + high volume = directional conviction |
-| Clustering | 10% | Multiple unusual contracts on same ticker = coordinated bet |
+| Volume vs baseline | 20% | Today's volume vs estimated daily normal (OI × 10%) |
+| Vol/OI ratio | 15% | New positions entering — high ratio = fresh money |
+| Notional | 15% | Size of bet in $ (volume × premium × 100) |
+| Directional flow | 12% | Call vs put volume ratio — extreme one-directional = conviction |
+| Near expiry | 12% | Shorter DTE = more leverage = more suspicious |
+| OI concentration | 10% | Abnormal OI concentrated in a single contract |
+| OTM depth | 8% | Deep out-of-the-money + high volume = directional conviction |
+| Clustering | 8% | Multiple unusual contracts on same ticker = coordinated bet |
 
 **Score ≥ 75** = High suspicion (red) · **Score ≥ 50** = Medium suspicion (yellow)
 

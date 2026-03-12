@@ -1,11 +1,13 @@
 """
-Escanea opciones call buscando actividad REALMENTE inusual.
+Escanea opciones buscando actividad REALMENTE inusual.
 
 Estrategia:
 1. Pre-filtra tickers sin opciones líquidas (ahorra tiempo)
 2. Compara volumen de hoy vs baseline del ticker (OI como proxy)
 3. Detecta clustering: múltiples strikes inusuales = señal fuerte
-4. Genera insights claros con fechas y razones concretas
+4. Analiza flujo direccional (calls vs puts) para detectar convicción extrema
+5. Detecta concentración anormal de OI en contratos específicos
+6. Genera insights claros con fechas y razones concretas
 """
 
 import time
@@ -74,7 +76,11 @@ def scan_ticker(ticker: str) -> list[dict]:
 
     now = datetime.now()
     all_calls = []
+    all_puts = []
     entries = []
+
+    # Per-expiration directional flow data
+    exp_flow = {}  # exp_str -> {calls_vol, puts_vol}
 
     for exp_str in expirations:
         exp_date = datetime.strptime(exp_str, "%Y-%m-%d")
@@ -88,10 +94,20 @@ def scan_ticker(ticker: str) -> list[dict]:
             continue
 
         calls = chain.calls
+        puts = chain.puts
+
+        # Aggregate calls/puts volume for directional flow
+        calls_vol_total = int(calls["volume"].fillna(0).sum()) if not calls.empty else 0
+        puts_vol_total = int(puts["volume"].fillna(0).sum()) if not puts.empty else 0
+        exp_flow[exp_str] = {"calls_vol": calls_vol_total, "puts_vol": puts_vol_total, "dte": dte}
+
+        if not calls.empty:
+            all_calls.append(calls)
+        if not puts.empty:
+            all_puts.append(puts)
+
         if calls.empty:
             continue
-
-        all_calls.append(calls)
 
         for _, row in calls.iterrows():
             strike = row.get("strike", 0)
@@ -144,12 +160,56 @@ def scan_ticker(ticker: str) -> list[dict]:
     else:
         baseline = 0
 
+    # Calcular flujo direccional agregado del ticker
+    total_calls_vol = sum(f["calls_vol"] for f in exp_flow.values())
+    total_puts_vol = sum(f["puts_vol"] for f in exp_flow.values())
+    total_options_vol = total_calls_vol + total_puts_vol
+    if total_options_vol > 0:
+        calls_pct = total_calls_vol / total_options_vol
+        puts_pct = total_puts_vol / total_options_vol
+        dominant_pct = max(calls_pct, puts_pct)
+        flow_direction = "ALCISTA" if calls_pct >= puts_pct else "BAJISTA"
+    else:
+        calls_pct = puts_pct = dominant_pct = 0
+        flow_direction = "NEUTRAL"
+
+    # Calcular concentración de OI
+    total_oi = 0
+    max_oi_contract = 0
+    if all_calls:
+        combined_calls = pd.concat(all_calls, ignore_index=True)
+        total_oi = int(combined_calls["openInterest"].fillna(0).sum())
+        max_oi_contract = int(combined_calls["openInterest"].fillna(0).max())
+    oi_concentration = max_oi_contract / total_oi if total_oi > 0 else 0
+
     # Enriquecer cada entrada con contexto
     cluster_count = len(entries)
     for e in entries:
         e["baseline"] = round(baseline, 0)
         e["vol_vs_baseline"] = round(e["volume"] / baseline, 1) if baseline > 0 else 0
         e["cluster_count"] = cluster_count
+
+        # Directional flow — per expiration
+        ef = exp_flow.get(e["expiration"], {})
+        exp_calls = ef.get("calls_vol", 0)
+        exp_puts = ef.get("puts_vol", 0)
+        exp_total = exp_calls + exp_puts
+        e["calls_volume"] = exp_calls
+        e["puts_volume"] = exp_puts
+        e["dominant_pct"] = round((max(exp_calls, exp_puts) / exp_total * 100) if exp_total > 0 else 0, 1)
+        e["flow_direction"] = "ALCISTA" if exp_calls >= exp_puts else "BAJISTA"
+
+        # Ticker-level flow
+        e["ticker_calls_vol"] = total_calls_vol
+        e["ticker_puts_vol"] = total_puts_vol
+        e["ticker_dominant_pct"] = round(dominant_pct * 100, 1)
+        e["ticker_flow_direction"] = flow_direction
+
+        # OI concentration
+        e["oi_concentration"] = round(oi_concentration * 100, 1)
+        e["ticker_total_oi"] = total_oi
+        e["max_oi_contract"] = max_oi_contract
+
         e["score"] = _score(e, cluster_count)
         e["reason"] = _build_reason(e, cluster_count)
 
@@ -160,36 +220,49 @@ def _score(e: dict, cluster_count: int) -> float:
     """Score de sospecha 0-100."""
     s = 0.0
 
-    # Volumen vs baseline (25%)
+    # Volumen vs baseline (20%)
     vb = e["vol_vs_baseline"]
     if vb >= config.VOL_ANOMALY_MULTIPLIER:
         s += min(100, (vb / 10) * 100) * config.WEIGHT_VOL_ANOMALY
-    elif vb > 0:
-        s += 0
 
-    # Vol/OI — posiciones nuevas (20%)
+    # Vol/OI — posiciones nuevas (15%)
     voi = e["vol_oi_ratio"]
     if voi >= config.MIN_VOL_OI_RATIO:
         s += min(100, (voi / 15) * 100) * config.WEIGHT_VOL_OI
 
-    # Notional (20%)
+    # Notional (15%)
     n = e["notional"]
     if n >= config.MIN_NOTIONAL:
         s += min(100, (n / 2_000_000) * 100) * config.WEIGHT_NOTIONAL
 
-    # Near-term (15%)
+    # Near-term (12%)
     dte = e["dte"]
     dte_s = 100 if dte <= 5 else 80 if dte <= 10 else 50 if dte <= 21 else 25 if dte <= 30 else 10
     s += dte_s * config.WEIGHT_NEAR_EXPIRY
 
-    # OTM depth (10%)
+    # OTM depth (8%)
     otm = e["otm_pct"]
     otm_s = 100 if otm >= 15 else 70 if otm >= 8 else 40 if otm >= 3 else 10
     s += otm_s * config.WEIGHT_OTM_DEPTH
 
-    # Clustering (10%)
+    # Clustering (8%)
     cl_s = 100 if cluster_count >= 5 else 70 if cluster_count >= 3 else 40 if cluster_count >= 2 else 0
     s += cl_s * config.WEIGHT_CLUSTERING
+
+    # Directional flow (12%)
+    dp = e.get("dominant_pct", 0)
+    if dp >= config.EXTREME_DIRECTIONAL_THRESHOLD * 100:
+        s += 100 * config.WEIGHT_DIRECTIONAL_FLOW
+    elif dp >= config.DIRECTIONAL_FLOW_THRESHOLD * 100:
+        s += 70 * config.WEIGHT_DIRECTIONAL_FLOW
+    elif dp >= 60:
+        s += 30 * config.WEIGHT_DIRECTIONAL_FLOW
+
+    # OI concentration (10%)
+    oi_conc = e.get("oi_concentration", 0)
+    max_oi = e.get("max_oi_contract", 0)
+    if oi_conc >= config.OI_CONCENTRATION_THRESHOLD * 100 and max_oi >= config.OI_CONCENTRATION_MIN:
+        s += min(100, (oi_conc / 50) * 100) * config.WEIGHT_OI_CONCENTRATION
 
     return round(s, 1)
 
@@ -204,10 +277,24 @@ def _build_reason(e: dict, cluster_count: int) -> str:
     elif vb >= 3:
         r.append(f"Volumen {vb:.1f}x sobre lo normal")
 
+    # Directional flow
+    dp = e.get("dominant_pct", 0)
+    direction = e.get("flow_direction", "")
+    if dp >= config.EXTREME_DIRECTIONAL_THRESHOLD * 100:
+        r.append(f"Flujo {direction} extremo: {dp:.1f}% en una direccion")
+    elif dp >= config.DIRECTIONAL_FLOW_THRESHOLD * 100:
+        r.append(f"Flujo {direction}: {dp:.1f}% direccional")
+
     if e["vol_oi_ratio"] >= 5:
         r.append(f"V/OI {e['vol_oi_ratio']:.0f}x — posiciones mayoritariamente nuevas")
     elif e["vol_oi_ratio"] >= 2:
         r.append(f"V/OI {e['vol_oi_ratio']:.1f}x — flujo de posiciones nuevas")
+
+    # OI concentration
+    oi_conc = e.get("oi_concentration", 0)
+    max_oi = e.get("max_oi_contract", 0)
+    if oi_conc >= config.OI_CONCENTRATION_THRESHOLD * 100 and max_oi >= config.OI_CONCENTRATION_MIN:
+        r.append(f"OI concentrado: {max_oi:,} contratos ({oi_conc:.0f}% del total)")
 
     if e["notional"] >= 1_000_000:
         r.append(f"Apuesta de ${e['notional']/1e6:.1f}M")
