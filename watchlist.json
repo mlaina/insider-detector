@@ -1,0 +1,7 @@
+{
+  "lists": {
+    "tech": ["AAPL", "MSFT", "GOOGL", "META", "NVDA", "AMD", "TSLA"],
+    "pharma": ["PFE", "MRNA", "JNJ", "LLY", "ABBV"],
+    "finance": ["JPM", "GS", "BAC", "MS", "C"]
+  }
+}

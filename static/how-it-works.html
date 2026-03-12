@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Como funciona — Insider Trading Detector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0a1a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    .glass { background: rgba(20,20,40,0.9); border: 1px solid rgba(99,102,241,0.12); }
+    .glass-hover:hover { border-color: rgba(99,102,241,0.3); }
+    .score-high { color: #ef4444; text-shadow: 0 0 8px rgba(239,68,68,0.4); }
+    .score-med { color: #f59e0b; }
+    .badge-high { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-med { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+    .badge-info { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+    ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-thumb { background:rgba(99,102,241,0.2); border-radius:3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-indigo-900/50 px-6 py-3">
+    <div class="max-w-[900px] mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <div class="w-7 h-7 rounded bg-indigo-600 flex items-center justify-center text-sm font-bold">IT</div>
+          <h1 class="text-lg font-semibold tracking-tight">Insider Trading Detector</h1>
+        </a>
+      </div>
+      <a href="/" class="text-xs text-slate-500 hover:text-indigo-400 transition-colors">&larr; Volver al scanner</a>
+    </div>
+  </header>
+
+  <main class="max-w-[900px] mx-auto px-6 py-8 space-y-10">
+
+    <!-- Hero -->
+    <div class="text-center">
+      <h2 class="text-2xl font-bold text-white mb-3">Como funciona la deteccion</h2>
+      <p class="text-sm text-slate-400 max-w-2xl mx-auto">Analiza en tiempo real las call options del S&P 500 y NASDAQ-100 buscando patrones que historicamente preceden a eventos corporativos: earnings sorpresa, M&A, aprobaciones FDA, y mas.</p>
+      <div class="flex items-center justify-center gap-6 mt-5 text-xs text-slate-500">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-indigo-500"></span>Datos publicos de Yahoo Finance</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>NASDAQ-100 + S&P 500</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span>Scoring de sospecha 0-100</span>
+      </div>
+    </div>
+
+    <!-- Que analiza -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Que analiza</h3>
+      <div class="glass rounded-lg p-5 text-sm text-slate-300 space-y-3">
+        <p>El sistema no mira el precio de la accion. Mira <strong class="text-white">quien esta apostando que, cuanto y cuando</strong> en el mercado de opciones.</p>
+        <p>Para cada empresa, descarga la <strong class="text-white">cadena de opciones call</strong> (contratos de compra) y extrae de cada contrato: volumen negociado hoy, open interest (posiciones abiertas acumuladas), strike, implied volatility, precio, y fecha de expiracion.</p>
+        <p>Luego filtra para quedarse solo con lo relevante:</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+          <div class="bg-slate-800/50 rounded px-3 py-2 text-center">
+            <div class="text-[10px] text-slate-500 uppercase">Tipo</div>
+            <div class="text-white text-xs mt-0.5">Solo calls ATM y OTM</div>
+          </div>
+          <div class="bg-slate-800/50 rounded px-3 py-2 text-center">
+            <div class="text-[10px] text-slate-500 uppercase">Volumen min.</div>
+            <div class="text-white text-xs mt-0.5">100 contratos</div>
+          </div>
+          <div class="bg-slate-800/50 rounded px-3 py-2 text-center">
+            <div class="text-[10px] text-slate-500 uppercase">Expiracion</div>
+            <div class="text-white text-xs mt-0.5">1 a 45 dias</div>
+          </div>
+          <div class="bg-slate-800/50 rounded px-3 py-2 text-center">
+            <div class="text-[10px] text-slate-500 uppercase">OTM maximo</div>
+            <div class="text-white text-xs mt-0.5">Hasta 30%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scoring -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Como calcula el score de sospecha (0-100)</h3>
+      <p class="text-xs text-slate-500 mb-3">Cada contrato que pasa los filtros recibe un score basado en 6 senales. Cada senal se normaliza a 0-100 y se multiplica por su peso:</p>
+      <div class="space-y-2">
+        <!-- Signal 1 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">25%</span>
+            <span class="text-sm font-semibold text-white">Volumen vs baseline del ticker</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Estima cuanto volumen de opciones es "normal" para esa empresa usando el Open Interest total como proxy (vol normal ~ 10% del OI). Si hoy se negocian 5x mas de lo normal, algo pasa.</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs">
+            <div class="text-slate-500 mb-1">Ejemplo:</div>
+            <div class="text-slate-300">Apple tiene OI total de 500K en calls cercanas &rarr; baseline ~50K contratos/dia. Si hoy se negocian 250K, eso es <strong class="text-red-400">5x sobre la media</strong>. Score parcial: 50/100.</div>
+          </div>
+        </div>
+        <!-- Signal 2 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">20%</span>
+            <span class="text-sm font-semibold text-white">Vol/OI ratio — Posiciones nuevas</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Cuando el volumen de un contrato especifico supera ampliamente su Open Interest, significa que son <strong class="text-white">posiciones nuevas</strong>, no gente rolleando o cerrando. Es la firma clasica de smart money entrando.</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs">
+            <div class="text-slate-500 mb-1">Ejemplo:</div>
+            <div class="text-slate-300">Call NVDA $150 exp 2 semanas: OI era 200 contratos. Hoy se negocian 4,000. Eso es <strong class="text-red-400">V/OI de 20x</strong> — 3,800 posiciones completamente nuevas en un contrato que casi no existia. Score parcial: 100/100.</div>
+          </div>
+        </div>
+        <!-- Signal 3 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">20%</span>
+            <span class="text-sm font-semibold text-white">Notional — Tamano de la apuesta en $</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Volumen x precio del contrato x 100 (multiplicador de opciones). Apuestas grandes implican conviccion o informacion. Un retail trader no mete $500K en una call OTM.</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs">
+            <div class="text-slate-500 mb-1">Escala:</div>
+            <div class="text-slate-300">$50K = minimo para alertar | $500K = senal fuerte | <strong class="text-red-400">$2M+ = score maximo</strong></div>
+          </div>
+        </div>
+        <!-- Signal 4 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">15%</span>
+            <span class="text-sm font-semibold text-white">Expiracion cercana — Maximo apalancamiento</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Calls near-term son baratas pero ofrecen maximo apalancamiento. Si alguien compra calls agresivas que expiran en 3 dias, esta apostando a un <strong class="text-white">movimiento inminente</strong>. Es la senal mas asociada a insider trading pre-evento.</p>
+          <div class="flex gap-2 mt-2 text-[11px]">
+            <span class="px-2 py-1 rounded bg-red-500/15 text-red-400 border border-red-500/20">&le; 5 dias &rarr; 100 pts</span>
+            <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">&le; 10 dias &rarr; 80 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-500/15 text-slate-400 border border-slate-500/20">&le; 21 dias &rarr; 50 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-700/50 text-slate-500 border border-slate-700/30">&le; 30 dias &rarr; 25 pts</span>
+          </div>
+        </div>
+        <!-- Signal 5 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">10%</span>
+            <span class="text-sm font-semibold text-white">Profundidad OTM — Apuesta direccional</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Calls muy fuera del dinero (10%+ por encima del spot) con volumen alto solo tienen sentido si esperas un movimiento grande. Es una apuesta extremadamente direccional.</p>
+          <div class="flex gap-2 mt-2 text-[11px]">
+            <span class="px-2 py-1 rounded bg-red-500/15 text-red-400 border border-red-500/20">&ge; 15% OTM &rarr; 100 pts</span>
+            <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">&ge; 8% &rarr; 70 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-500/15 text-slate-400 border border-slate-500/20">&ge; 3% &rarr; 40 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-700/50 text-slate-500 border border-slate-700/30">ATM &rarr; 10 pts</span>
+          </div>
+        </div>
+        <!-- Signal 6 -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded">10%</span>
+            <span class="text-sm font-semibold text-white">Clustering — Patron, no casualidad</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Multiples contratos inusuales en el mismo ticker (distintos strikes o expiraciones) sugieren que alguien esta distribuyendo una apuesta grande para ser menos visible.</p>
+          <div class="flex gap-2 mt-2 text-[11px]">
+            <span class="px-2 py-1 rounded bg-red-500/15 text-red-400 border border-red-500/20">&ge; 5 contratos &rarr; 100 pts</span>
+            <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">&ge; 3 &rarr; 70 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-500/15 text-slate-400 border border-slate-500/20">2 &rarr; 40 pts</span>
+            <span class="px-2 py-1 rounded bg-slate-700/50 text-slate-500 border border-slate-700/30">1 solo &rarr; 0 pts</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contexto público -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Filtro de contexto publico: Reddit y Earnings</h3>
+      <div class="glass rounded-lg p-5 text-sm text-slate-300 space-y-3">
+        <p>No toda actividad inusual es insider trading. Para separar la senal del ruido, cruzamos cada ticker con <strong class="text-white">Reddit</strong> y datos de <strong class="text-white">earnings</strong>.</p>
+      </div>
+
+      <div class="space-y-2 mt-3">
+        <!-- Reddit -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(255,69,0,0.15);color:#ff8a65;border:1px solid rgba(255,69,0,0.3)">Reddit</span>
+            <span class="text-sm font-semibold text-white">Deteccion de hype publico</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Buscamos menciones recientes del ticker en <strong class="text-white">r/wallstreetbets</strong>, <strong class="text-white">r/stocks</strong> y <strong class="text-white">r/options</strong> de la ultima semana. Si un ticker esta trending en Reddit, la actividad inusual probablemente es hype retail, no insider.</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs space-y-1 mb-2">
+            <div class="text-slate-500 mb-1">Clasificacion:</div>
+            <div class="flex gap-2 flex-wrap">
+              <span class="px-2 py-1 rounded text-[10px]" style="background:rgba(255,69,0,0.15);color:#ff8a65;border:1px solid rgba(255,69,0,0.3)">VIRAL — 15+ posts, engagement alto &rarr; -10 pts</span>
+              <span class="px-2 py-1 rounded text-[10px]" style="background:rgba(255,69,0,0.1);color:#ff8a65;border:1px solid rgba(255,69,0,0.2)">Trending — 8+ posts &rarr; -5 pts</span>
+              <span class="px-2 py-1 rounded text-[10px]" style="background:rgba(255,69,0,0.05);color:#ff8a65;border:1px solid rgba(255,69,0,0.1)">Mencionado — 3+ posts &rarr; 0 pts (solo informativo)</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">La penalizacion es suave — un ticker en Reddit no descarta insider trading, pero da contexto. En la modal de cada empresa se muestran los <strong class="text-slate-300">links directos a los posts</strong> con fecha de publicacion, upvotes y comentarios.</p>
+        </div>
+
+        <!-- Earnings -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(168,85,247,0.15);color:#c4b5fd;border:1px solid rgba(168,85,247,0.3)">Earnings</span>
+            <span class="text-sm font-semibold text-white">Fechas de resultados</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-2">Mostramos la <strong class="text-white">fecha de earnings</strong> y los <strong class="text-white">dias restantes</strong> para cada empresa. Los earnings <strong>no penalizan</strong> el score — al contrario: actividad inusual justo antes de earnings puede ser exactamente insider trading (alguien sabe que los resultados seran buenos).</p>
+          <div class="bg-slate-800/40 rounded p-3 text-xs">
+            <div class="text-slate-500 mb-1">Ejemplo:</div>
+            <div class="text-slate-300">NVDA tiene earnings en 3 dias. Se detecta un pico de calls $200 OTM con $2M de notional. Esto es <strong class="text-red-400">exactamente el patron de insider trading pre-earnings</strong>.</div>
+          </div>
+        </div>
+
+        <!-- Sin ruido -->
+        <div class="glass rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3)">Sin ruido publico</span>
+            <span class="text-sm font-semibold text-white">La senal mas limpia</span>
+          </div>
+          <p class="text-xs text-slate-400">Si un ticker tiene actividad inusual y <strong class="text-white">no aparece en Reddit</strong> ni tiene earnings proximos, no hay explicacion publica para el movimiento. Estas son las alertas con mayor probabilidad de ser insider trading genuino.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ejemplo completo de score -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Ejemplo completo: como se calcula un score</h3>
+      <div class="glass rounded-lg p-5 space-y-4">
+        <p class="text-xs text-slate-400">Supongamos que detectamos esta actividad en <strong class="text-white">ACME Corp</strong> (spot $130):</p>
+        <div class="bg-slate-800/40 rounded p-4 text-xs space-y-1 font-mono text-slate-300">
+          <div>Call $150 (15% OTM) &bull; Expira en 4 dias &bull; Vol: 5,000 &bull; OI: 200 &bull; Notional: $800K</div>
+          <div class="text-slate-500">+ 4 contratos inusuales mas en el mismo ticker</div>
+          <div class="text-slate-500">Volumen total del ticker: 8x sobre su media historica</div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead><tr class="text-[10px] text-slate-500 uppercase border-b border-slate-800/50">
+              <th class="px-3 py-1.5 text-left">Senal</th>
+              <th class="px-3 py-1.5 text-right">Valor</th>
+              <th class="px-3 py-1.5 text-right">Pts (0-100)</th>
+              <th class="px-3 py-1.5 text-right">Peso</th>
+              <th class="px-3 py-1.5 text-right">Aporte</th>
+            </tr></thead>
+            <tbody class="text-slate-300">
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Vol vs baseline</td><td class="px-3 py-1.5 text-right text-red-400">8x</td><td class="px-3 py-1.5 text-right">80</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.25</td><td class="px-3 py-1.5 text-right font-bold">20.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Vol/OI</td><td class="px-3 py-1.5 text-right text-red-400">25x</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.20</td><td class="px-3 py-1.5 text-right font-bold">20.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Notional</td><td class="px-3 py-1.5 text-right text-indigo-300">$800K</td><td class="px-3 py-1.5 text-right">40</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.20</td><td class="px-3 py-1.5 text-right font-bold">8.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">Expiracion</td><td class="px-3 py-1.5 text-right text-red-400">4 dias</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.15</td><td class="px-3 py-1.5 text-right font-bold">15.0</td></tr>
+              <tr class="border-b border-slate-800/30"><td class="px-3 py-1.5">OTM depth</td><td class="px-3 py-1.5 text-right text-amber-400">15%</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.10</td><td class="px-3 py-1.5 text-right font-bold">10.0</td></tr>
+              <tr><td class="px-3 py-1.5">Clustering</td><td class="px-3 py-1.5 text-right text-amber-400">5</td><td class="px-3 py-1.5 text-right">100</td><td class="px-3 py-1.5 text-right text-slate-500">x 0.10</td><td class="px-3 py-1.5 text-right font-bold">10.0</td></tr>
+            </tbody>
+            <tfoot><tr class="border-t border-indigo-500/30"><td colspan="4" class="px-3 py-2 text-right font-semibold text-white">SCORE TOTAL</td><td class="px-3 py-2 text-right text-lg font-bold text-red-400">83</td></tr></tfoot>
+          </table>
+        </div>
+        <p class="text-xs text-slate-500">Score 83 &rarr; <span class="text-red-400 font-semibold">ALTA SOSPECHA</span>. Alguien aposto $800K en calls 15% OTM que expiran en 4 dias, con un volumen 25x superior al OI existente y 8x sobre la media del ticker. No es actividad normal.</p>
+      </div>
+    </div>
+
+    <!-- Ejemplo visual: insight card mock -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Asi se ven las alertas</h3>
+
+      <!-- Mock insight card HIGH -->
+      <div class="glass glass-hover rounded-lg p-4 mb-2">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="text-lg font-bold text-white">ACME</span>
+          <span class="text-sm text-slate-400">Acme Corporation Inc.</span>
+          <span class="text-xs text-slate-600">@ $130.45</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-semibold badge-high">ALTA SOSPECHA</span>
+          <span class="px-2 py-0.5 rounded text-[10px] badge-info">Score 83</span>
+        </div>
+        <div class="flex items-center gap-4 mb-2 text-xs">
+          <span class="text-slate-500">5 contratos inusuales</span>
+          <span class="text-slate-500">|</span>
+          <span>Apuesta total: <strong class="text-indigo-300 text-sm">$2.1M</strong></span>
+        </div>
+        <div class="pl-1">
+          <div class="flex items-start gap-4 text-xs py-2 border-t border-slate-800/30">
+            <div class="min-w-[140px]">
+              <div class="text-indigo-400 font-mono">2026-03-15</div>
+              <div class="mt-0.5"><span class="text-red-400 font-bold">4 dias</span></div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Apuesta</div>
+              <div class="text-indigo-300 font-bold text-sm">$800K</div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Strikes</div>
+              <div class="text-slate-300">$150, $155</div>
+            </div>
+            <div class="min-w-[80px]">
+              <div class="text-[10px] text-slate-500 uppercase">Volumen</div>
+              <div class="text-emerald-400">5,200</div>
+            </div>
+            <div class="flex-1">
+              <div class="text-[10px] text-slate-500 uppercase">Senal</div>
+              <div class="text-slate-400">Volumen 8x sobre lo normal | V/OI 25x — posiciones nuevas | Expira en 4 dias</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-4 text-xs py-2 border-t border-slate-800/30">
+            <div class="min-w-[140px]">
+              <div class="text-indigo-400 font-mono">2026-03-21</div>
+              <div class="mt-0.5"><span class="text-amber-400 font-semibold">10 dias</span></div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Apuesta</div>
+              <div class="text-indigo-300 font-bold text-sm">$1.3M</div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Strikes</div>
+              <div class="text-slate-300">$145, $150, $160</div>
+            </div>
+            <div class="min-w-[80px]">
+              <div class="text-[10px] text-slate-500 uppercase">Volumen</div>
+              <div class="text-emerald-400">8,400</div>
+            </div>
+            <div class="flex-1">
+              <div class="text-[10px] text-slate-500 uppercase">Senal</div>
+              <div class="text-slate-400">Apuesta de $1.3M | V/OI 12x — posiciones nuevas | 15% fuera del dinero</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mock insight card MEDIUM -->
+      <div class="glass glass-hover rounded-lg p-4 mb-2">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="text-lg font-bold text-white">XYZ</span>
+          <span class="text-sm text-slate-400">XYZ Pharmaceuticals Ltd.</span>
+          <span class="text-xs text-slate-600">@ $42.80</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-semibold badge-med">SOSPECHA MEDIA</span>
+          <span class="px-2 py-0.5 rounded text-[10px] badge-info">Score 58</span>
+        </div>
+        <div class="flex items-center gap-4 mb-2 text-xs">
+          <span class="text-slate-500">2 contratos inusuales</span>
+          <span class="text-slate-500">|</span>
+          <span>Apuesta total: <strong class="text-indigo-300 text-sm">$340K</strong></span>
+        </div>
+        <div class="pl-1">
+          <div class="flex items-start gap-4 text-xs py-2 border-t border-slate-800/30">
+            <div class="min-w-[140px]">
+              <div class="text-indigo-400 font-mono">2026-04-17</div>
+              <div class="mt-0.5"><span class="text-slate-300">37 dias</span></div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Apuesta</div>
+              <div class="text-indigo-300 font-bold text-sm">$340K</div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Strikes</div>
+              <div class="text-slate-300">$50, $55</div>
+            </div>
+            <div class="min-w-[80px]">
+              <div class="text-[10px] text-slate-500 uppercase">Volumen</div>
+              <div class="text-emerald-400">3,100</div>
+            </div>
+            <div class="flex-1">
+              <div class="text-[10px] text-slate-500 uppercase">Senal</div>
+              <div class="text-slate-400">Volumen 4x sobre lo normal | Apuesta de $340K | 17% fuera del dinero — apuesta agresiva</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-600 mt-3">Estos son ejemplos ficticios. Los datos reales se generan al escanear.</p>
+    </div>
+
+    <!-- Mock table row -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Detalle por contrato</h3>
+      <div class="glass rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-[10px] text-slate-500 uppercase tracking-wider border-b border-slate-800/50">
+                <th class="px-3 py-2 text-right">Score</th>
+                <th class="px-3 py-2 text-left">Empresa</th>
+                <th class="px-3 py-2 text-right">Apuesta</th>
+                <th class="px-3 py-2 text-center">Expira en</th>
+                <th class="px-3 py-2 text-right">Strike</th>
+                <th class="px-3 py-2 text-right">Spot</th>
+                <th class="px-3 py-2 text-right">OTM%</th>
+                <th class="px-3 py-2 text-right">Volumen</th>
+                <th class="px-3 py-2 text-right">OI</th>
+                <th class="px-3 py-2 text-right">V/OI</th>
+                <th class="px-3 py-2 text-right">vs Media</th>
+                <th class="px-3 py-2 text-right">IV%</th>
+                <th class="px-3 py-2 text-left">Razon</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-900/50">
+                <td class="px-3 py-2 text-right font-bold score-high">83</td>
+                <td class="px-3 py-2"><div class="font-bold text-white">ACME</div><div class="text-[10px] text-slate-500">Acme Corporation Inc.</div></td>
+                <td class="px-3 py-2 text-right"><div class="font-bold text-indigo-300 text-sm">$800K</div><div class="text-[10px] text-slate-600">5,000 contratos</div></td>
+                <td class="px-3 py-2 text-center"><div><span class="text-red-400 font-bold">4 dias</span></div><div class="text-[10px] text-slate-600 font-mono">2026-03-15</div></td>
+                <td class="px-3 py-2 text-right">150.0</td>
+                <td class="px-3 py-2 text-right text-slate-500">130.45</td>
+                <td class="px-3 py-2 text-right text-amber-400">15.0%</td>
+                <td class="px-3 py-2 text-right text-emerald-400 font-medium">5,000</td>
+                <td class="px-3 py-2 text-right text-slate-500">200</td>
+                <td class="px-3 py-2 text-right text-red-400 font-bold">25.0x</td>
+                <td class="px-3 py-2 text-right text-red-400 font-bold">8.0x</td>
+                <td class="px-3 py-2 text-right">65%</td>
+                <td class="px-3 py-2 text-slate-500 max-w-[300px] truncate">Vol 8x sobre lo normal | V/OI 25x — posiciones nuevas | Expira en 4 dias</td>
+              </tr>
+              <tr class="border-b border-slate-900/50">
+                <td class="px-3 py-2 text-right font-bold score-med">58</td>
+                <td class="px-3 py-2"><div class="font-bold text-white">XYZ</div><div class="text-[10px] text-slate-500">XYZ Pharmaceuticals Ltd.</div></td>
+                <td class="px-3 py-2 text-right"><div class="font-bold text-indigo-300 text-sm">$190K</div><div class="text-[10px] text-slate-600">1,800 contratos</div></td>
+                <td class="px-3 py-2 text-center"><div><span class="text-slate-300">37 dias</span></div><div class="text-[10px] text-slate-600 font-mono">2026-04-17</div></td>
+                <td class="px-3 py-2 text-right">50.0</td>
+                <td class="px-3 py-2 text-right text-slate-500">42.80</td>
+                <td class="px-3 py-2 text-right text-amber-400">16.8%</td>
+                <td class="px-3 py-2 text-right text-emerald-400 font-medium">1,800</td>
+                <td class="px-3 py-2 text-right text-slate-500">450</td>
+                <td class="px-3 py-2 text-right">4.0x</td>
+                <td class="px-3 py-2 text-right text-amber-400">4.2x</td>
+                <td class="px-3 py-2 text-right">82%</td>
+                <td class="px-3 py-2 text-slate-500 max-w-[300px] truncate">Vol 4x sobre lo normal | Apuesta de $190K | 17% OTM — apuesta agresiva</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitaciones -->
+    <div>
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Limitaciones</h3>
+      <div class="glass rounded-lg p-5 text-xs text-slate-400 space-y-2">
+        <div class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">!</span><span><strong class="text-slate-300">Baseline estimado</strong> — Sin datos historicos reales de volumen de opciones (requiere proveedor de pago como CBOE o Unusual Whales), usamos el Open Interest como proxy. Es una buena aproximacion pero no perfecta.</span></div>
+        <div class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">!</span><span><strong class="text-slate-300">Sin deteccion de sweeps</strong> — No detectamos cuando alguien golpea multiples exchanges simultaneamente (requiere datos Level 2 en tiempo real).</span></div>
+        <div class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">!</span><span><strong class="text-slate-300">No distingue compra vs venta</strong> — Yahoo Finance no indica si el volumen es de compra (bullish) o venta (bearish). Una venta masiva de calls se veria igual que una compra.</span></div>
+        <div class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">!</span><span><strong class="text-slate-300">Datos con delay</strong> — Los datos de Yahoo Finance tienen un retraso de ~15 minutos. Para deteccion en tiempo real se necesitarian feeds directos de mercado.</span></div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center py-6">
+      <a href="/" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2 rounded text-sm transition-colors">&larr; Volver al scanner</a>
+    </div>
+  </main>
+</body>
+</html>

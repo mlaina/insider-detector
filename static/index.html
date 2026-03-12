@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insider Trading Detector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0a1a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    .glass { background: rgba(20,20,40,0.9); border: 1px solid rgba(99,102,241,0.12); }
+    .glass-hover:hover { border-color: rgba(99,102,241,0.3); }
+    .score-high { color: #ef4444; text-shadow: 0 0 8px rgba(239,68,68,0.4); }
+    .score-med { color: #f59e0b; }
+    .score-low { color: #64748b; }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .fade-in { animation: fadeIn .25s ease-out; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+    .badge-high { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-med { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+    .badge-info { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+    .badge-reddit { background: rgba(255,69,0,0.15); color: #ff8a65; border: 1px solid rgba(255,69,0,0.3); }
+    .badge-earnings { background: rgba(168,85,247,0.15); color: #c4b5fd; border: 1px solid rgba(168,85,247,0.3); }
+    .badge-genuine { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+    input, select { background: rgba(10,10,26,0.9); border: 1px solid rgba(99,102,241,0.25); color: #e2e8f0; }
+    input:focus, select:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,0.15); }
+    .progress-bar { transition: width 0.3s ease; }
+    tr:hover td { background: rgba(99,102,241,0.06); }
+    ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-thumb { background:rgba(99,102,241,0.2); border-radius:3px; }
+    details summary { cursor: pointer; list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-indigo-900/50 px-6 py-3">
+    <div class="max-w-[1400px] mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded bg-indigo-600 flex items-center justify-center text-sm font-bold">IT</div>
+        <h1 class="text-lg font-semibold tracking-tight">Insider Trading Detector</h1>
+        <span class="text-xs text-slate-500 ml-2">Unusual Options Activity Scanner</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="/how-it-works" target="_blank" class="text-xs text-slate-500 hover:text-indigo-400 transition-colors">Como funciona</a>
+        <div id="status" class="text-xs text-slate-500">Listo</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1400px] mx-auto px-6 py-5 space-y-5">
+
+    <!-- Controls -->
+    <div class="glass rounded-lg p-4">
+      <div class="flex flex-wrap gap-3 items-end">
+        <div class="min-w-[160px]">
+          <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Fuente</label>
+          <select id="sourceSelect" class="w-full rounded px-3 py-1.5 text-sm" onchange="onSourceChange()">
+            <option value="watchlist">Watchlists</option>
+            <option value="index">Indice</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div id="watchlistGroup" class="min-w-[160px]">
+          <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Watchlist</label>
+          <select id="listSelect" class="w-full rounded px-3 py-1.5 text-sm">
+            <option value="">Todas</option>
+          </select>
+        </div>
+
+        <div id="indexGroup" class="min-w-[200px] hidden">
+          <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Indice</label>
+          <select id="indexSelect" class="w-full rounded px-3 py-1.5 text-sm"></select>
+        </div>
+
+        <div id="customGroup" class="flex-[2] min-w-[250px] hidden">
+          <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Tickers</label>
+          <input type="text" id="tickerInput" placeholder="AAPL, TSLA, NVDA..." class="w-full rounded px-3 py-1.5 text-sm">
+        </div>
+
+        <div class="w-20">
+          <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Umbral</label>
+          <input type="number" id="threshold" value="40" min="0" max="100" class="w-full rounded px-2 py-1.5 text-sm text-center">
+        </div>
+
+        <button id="scanBtn" onclick="startScan()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-1.5 rounded text-sm transition-colors">
+          Escanear
+        </button>
+
+        <button id="fullScanBtn" onclick="startFullScan()" class="bg-red-600/80 hover:bg-red-500 text-white font-medium px-5 py-1.5 rounded text-sm transition-colors" title="Escanear todos los indices combinados">
+          Full Scan
+        </button>
+
+        <div class="ml-auto min-w-[220px] relative">
+          <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Historial</label>
+          <select id="historySelect" class="w-full rounded px-3 py-1.5 text-sm" onchange="onHistorySelect()">
+            <option value="">— Escaneos anteriores —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div id="progressSection" class="hidden mt-3">
+        <div class="flex items-center gap-3 text-xs">
+          <div class="flex-1 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="progressBar" class="h-full bg-indigo-500 progress-bar" style="width:0%"></div>
+          </div>
+          <span id="progressText" class="text-slate-400 min-w-[120px] text-right"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div id="summary" class="grid grid-cols-2 md:grid-cols-5 gap-3 hidden">
+      <div class="glass rounded-lg p-3 text-center">
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Escaneados</div>
+        <div id="sumTickers" class="text-xl font-bold text-indigo-400 mt-0.5">0</div>
+      </div>
+      <div class="glass rounded-lg p-3 text-center">
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Con alertas</div>
+        <div id="sumWithAlerts" class="text-xl font-bold text-white mt-0.5">0</div>
+      </div>
+      <div class="glass rounded-lg p-3 text-center">
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Total alertas</div>
+        <div id="sumTotal" class="text-xl font-bold text-white mt-0.5">0</div>
+      </div>
+      <div class="glass rounded-lg p-3 text-center">
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Alta sospecha</div>
+        <div id="sumHigh" class="text-xl font-bold text-red-400 mt-0.5">0</div>
+      </div>
+      <div class="glass rounded-lg p-3 text-center">
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Media sospecha</div>
+        <div id="sumMedium" class="text-xl font-bold text-amber-400 mt-0.5">0</div>
+      </div>
+    </div>
+
+    <!-- Insights panel -->
+    <div id="insightsSection" class="hidden space-y-3">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Insights — Sospechas de Insider Trading</h2>
+      <div id="insightsList" class="space-y-2"></div>
+    </div>
+
+    <!-- Full alerts table -->
+    <div id="alertsSection" class="hidden">
+      <div class="glass rounded-lg overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-indigo-900/30 flex items-center justify-between">
+          <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Todos los contratos con actividad inusual</h2>
+          <div class="flex items-center gap-3">
+            <span id="scanTime" class="text-[10px] text-slate-600"></span>
+            <input type="text" id="filterInput" placeholder="Filtrar ticker..." class="rounded px-2 py-1 text-xs w-32" oninput="renderAlerts()">
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-[10px] text-slate-500 uppercase tracking-wider border-b border-slate-800/50">
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('score')">Score</th>
+                <th class="px-3 py-2 text-left cursor-pointer hover:text-white" onclick="sortBy('ticker')">Empresa</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('notional')">Apuesta</th>
+                <th class="px-3 py-2 text-center cursor-pointer hover:text-white" onclick="sortBy('dte')">Expira en</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('strike')">Strike</th>
+                <th class="px-3 py-2 text-right">Spot</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('otm_pct')">OTM%</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('volume')">Volumen</th>
+                <th class="px-3 py-2 text-right">OI</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('vol_oi_ratio')">V/OI</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('vol_vs_baseline')">vs Media</th>
+                <th class="px-3 py-2 text-right cursor-pointer hover:text-white" onclick="sortBy('implied_vol')">IV%</th>
+                <th class="px-3 py-2 text-left">Razon</th>
+              </tr>
+            </thead>
+            <tbody id="alertsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="text-center py-12">
+      <h2 class="text-xl font-bold text-white mb-2">Unusual Options Activity Scanner</h2>
+      <p class="text-sm text-slate-400 max-w-xl mx-auto mb-5">Detecta flujos alcistas inusuales en call options del S&P 500 y NASDAQ-100 que pueden anticipar eventos corporativos.</p>
+      <div class="flex items-center justify-center gap-2 text-[10px] text-slate-600 mb-4">
+        <span>Score &ge; 75 = <span class="text-red-400">Alta sospecha</span></span>
+        <span>|</span>
+        <span>Score &ge; 50 = <span class="text-amber-400">Sospecha media</span></span>
+      </div>
+      <a href="/how-it-works" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-4">Como funciona la deteccion &rarr;</a>
+    </div>
+
+
+    <!-- Watchlist management -->
+    <details class="glass rounded-lg">
+      <summary class="px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+        <span>Gestionar Watchlists</span>
+        <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </summary>
+      <div class="px-4 pb-4 space-y-3 border-t border-slate-800/50 pt-3">
+        <div class="flex gap-2">
+          <input type="text" id="newListName" placeholder="Nombre" class="flex-1 rounded px-2 py-1.5 text-xs">
+          <input type="text" id="newListTickers" placeholder="AAPL, MSFT, GOOGL" class="flex-[3] rounded px-2 py-1.5 text-xs">
+          <button onclick="addList()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs">Agregar</button>
+        </div>
+        <div id="watchlistItems" class="space-y-1"></div>
+      </div>
+    </details>
+  </main>
+
+  <!-- Modal detalle -->
+  <div id="modal" class="fixed inset-0 z-50 hidden" onclick="if(event.target===this||event.target.classList.contains('backdrop-blur-sm'))closeModal()">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="relative max-w-3xl mx-auto mt-16 mb-8 max-h-[calc(100vh-8rem)] overflow-y-auto glass rounded-xl p-6 shadow-2xl" style="border-color:rgba(99,102,241,0.25)">
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    let allAlerts = [];
+    let scanData = null;
+    let sortField = 'score';
+    let sortAsc = false;
+
+    // --- Source switching ---
+    function onSourceChange() {
+      const src = document.getElementById('sourceSelect').value;
+      document.getElementById('watchlistGroup').classList.toggle('hidden', src !== 'watchlist');
+      document.getElementById('indexGroup').classList.toggle('hidden', src !== 'index');
+      document.getElementById('customGroup').classList.toggle('hidden', src !== 'custom');
+    }
+
+    // --- Watchlist ---
+    async function loadWatchlist() {
+      const res = await fetch('/api/watchlist');
+      const data = await res.json();
+      const select = document.getElementById('listSelect');
+      const items = document.getElementById('watchlistItems');
+      select.innerHTML = '<option value="">Todas</option>';
+      items.innerHTML = '';
+      for (const [name, tickers] of Object.entries(data.lists || {})) {
+        select.innerHTML += `<option value="${name}">${name} (${tickers.length})</option>`;
+        items.innerHTML += `<div class="flex items-center gap-2 text-xs">
+          <span class="text-indigo-400 font-medium w-20">${name}</span>
+          <span class="text-slate-500 flex-1 truncate">${tickers.join(', ')}</span>
+          <button onclick="deleteList('${name}')" class="text-red-400/60 hover:text-red-400 px-1">x</button>
+        </div>`;
+      }
+    }
+    async function addList() {
+      const name = document.getElementById('newListName').value.trim();
+      const tickers = document.getElementById('newListTickers').value.split(',').map(t=>t.trim()).filter(Boolean);
+      if (!name || !tickers.length) return;
+      await fetch(`/api/watchlist/${name}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(tickers) });
+      document.getElementById('newListName').value = '';
+      document.getElementById('newListTickers').value = '';
+      loadWatchlist();
+    }
+    async function deleteList(name) {
+      await fetch(`/api/watchlist/${name}`, {method:'DELETE'});
+      loadWatchlist();
+    }
+
+    // --- Build scan URL ---
+    function buildScanParams() {
+      const src = document.getElementById('sourceSelect').value;
+      const threshold = document.getElementById('threshold').value;
+      let params = `threshold=${threshold}`;
+      if (src === 'watchlist') {
+        const list = document.getElementById('listSelect').value;
+        if (list) params += `&list=${encodeURIComponent(list)}`;
+      } else if (src === 'index') {
+        params += `&index=${document.getElementById('indexSelect').value}`;
+      } else {
+        const tickers = document.getElementById('tickerInput').value.trim();
+        if (tickers) params += `&tickers=${encodeURIComponent(tickers)}`;
+      }
+      return params;
+    }
+
+    // --- Scan with SSE (streaming) ---
+    async function startScan() {
+      const btn = document.getElementById('scanBtn');
+      const status = document.getElementById('status');
+      const src = document.getElementById('sourceSelect').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Escaneando...';
+      btn.classList.add('opacity-50');
+
+      allAlerts = [];
+      document.getElementById('emptyState').classList.add('hidden');
+      document.getElementById('insightsSection').classList.add('hidden');
+      document.getElementById('alertsSection').classList.add('hidden');
+
+      const useStream = (src === 'index');
+      const params = buildScanParams();
+
+      if (useStream) {
+        // SSE streaming for large scans
+        document.getElementById('progressSection').classList.remove('hidden');
+        const evtSource = new EventSource(`/api/scan/stream?${params}`);
+
+        evtSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'progress') {
+            const pct = ((data.current / data.total) * 100).toFixed(0);
+            document.getElementById('progressBar').style.width = pct + '%';
+            document.getElementById('progressText').textContent = `${data.current}/${data.total} — ${data.ticker}`;
+            status.innerHTML = `<span class="pulse text-indigo-400">${data.current}/${data.total}</span>`;
+          }
+          else if (data.type === 'alert') {
+            allAlerts.push(data.alert);
+          }
+          else if (data.type === 'done') {
+            evtSource.close();
+            document.getElementById('progressSection').classList.add('hidden');
+            allAlerts = data.alerts || allAlerts;
+            showResults(data, allAlerts);
+            btn.disabled = false;
+            btn.textContent = 'Escanear';
+            btn.classList.remove('opacity-50');
+            status.textContent = `Escaneado ${new Date().toLocaleTimeString('es-ES')}`;
+            loadHistory();
+          }
+        };
+
+        evtSource.onerror = () => {
+          evtSource.close();
+          document.getElementById('progressSection').classList.add('hidden');
+          btn.disabled = false;
+          btn.textContent = 'Escanear';
+          btn.classList.remove('opacity-50');
+          status.innerHTML = '<span class="text-red-400">Error de conexion</span>';
+        };
+      } else {
+        // Regular fetch for small scans
+        status.innerHTML = '<span class="pulse text-indigo-400">Escaneando...</span>';
+        try {
+          const res = await fetch(`/api/scan?${params}`);
+          const data = await res.json();
+          allAlerts = data.alerts;
+          showResults({
+            tickers_scanned: data.tickers_scanned,
+            tickers_with_alerts: data.tickers_with_alerts,
+            total_alerts: data.summary.total,
+            high: data.summary.high,
+            medium: data.summary.medium,
+            insights: data.insights,
+            scan_time: data.scan_time,
+          }, allAlerts);
+          loadHistory();
+        } catch(e) {
+          status.innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
+        }
+        btn.disabled = false;
+        btn.textContent = 'Escanear';
+        btn.classList.remove('opacity-50');
+        status.textContent = `Escaneado ${new Date().toLocaleTimeString('es-ES')}`;
+      }
+    }
+
+    // --- Show results ---
+    function showResults(summary, alerts) {
+      scanData = summary;
+      // Summary
+      document.getElementById('summary').classList.remove('hidden');
+      document.getElementById('sumTickers').textContent = summary.tickers_scanned;
+      document.getElementById('sumWithAlerts').textContent = summary.tickers_with_alerts;
+      document.getElementById('sumTotal').textContent = summary.total_alerts;
+      document.getElementById('sumHigh').textContent = summary.high;
+      document.getElementById('sumMedium').textContent = summary.medium;
+      document.getElementById('scanTime').textContent = new Date(summary.scan_time).toLocaleTimeString('es-ES');
+
+      // Insights
+      if (summary.insights && summary.insights.length > 0) {
+        document.getElementById('insightsSection').classList.remove('hidden');
+        renderInsights(summary.insights);
+      }
+
+      // Table
+      if (alerts.length > 0) {
+        document.getElementById('alertsSection').classList.remove('hidden');
+        renderAlerts();
+      }
+    }
+
+    // --- Render insights ---
+    function fmtMoney(v) {
+      if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`;
+      if (v >= 1e3) return `$${(v/1e3).toFixed(0)}K`;
+      return `$${v.toFixed(0)}`;
+    }
+    function fmtDte(d) {
+      if (d <= 1) return `<span class="text-red-400 font-bold">MANANA</span>`;
+      if (d <= 3) return `<span class="text-red-400 font-bold">${d} dias</span>`;
+      if (d <= 7) return `<span class="text-amber-400 font-semibold">${d} dias</span>`;
+      if (d <= 14) return `<span class="text-amber-300">${d} dias</span>`;
+      return `<span class="text-slate-300">${d} dias</span>`;
+    }
+
+    function renderInsights(insights) {
+      const el = document.getElementById('insightsList');
+      el.innerHTML = insights.map(ins => {
+        const maxScore = ins.max_score;
+        const levelLabel = maxScore >= 75 ? 'ALTA SOSPECHA' : 'SOSPECHA MEDIA';
+        const badgeClass = maxScore >= 75 ? 'badge-high' : 'badge-med';
+        const companyName = ins.company || ins.alerts[0]?.company || ins.ticker;
+        const notional = fmtMoney(ins.total_notional);
+
+        // Context badges
+        const ctx = ins.context || {};
+        const ctxTags = ctx.tags || [];
+        let contextBadges = '';
+        if (ctxTags.includes('reddit_viral')) contextBadges += '<span class="px-2 py-0.5 rounded text-[10px] font-semibold badge-reddit">VIRAL Reddit</span>';
+        else if (ctxTags.includes('reddit_trending')) contextBadges += '<span class="px-2 py-0.5 rounded text-[10px] badge-reddit">Trending Reddit</span>';
+        else if (ctxTags.includes('reddit_mentioned')) contextBadges += '<span class="px-2 py-0.5 rounded text-[10px] badge-reddit">Reddit</span>';
+        if (ctx.has_earnings && ctx.days_to_earnings != null) {
+          const ed = ctx.earnings_date || '';
+          const dd = ctx.days_to_earnings;
+          const urgency = dd <= 3 ? 'font-semibold' : '';
+          contextBadges += `<span class="px-2 py-0.5 rounded text-[10px] ${urgency} badge-earnings">Earnings ${ed} (${dd}d)</span>`;
+        }
+        if (!ctx.tags?.length && ctx.reddit_mentions === 0 && !ctx.has_earnings) contextBadges += '<span class="px-2 py-0.5 rounded text-[10px] font-semibold badge-genuine">Sin ruido publico</span>';
+        const rawScore = ins.raw_max_score || ins.max_score;
+        const penaltyInfo = ctx.penalty > 0 ? `<span class="text-[10px] text-slate-600 ml-1">(raw: ${rawScore.toFixed(0)}, -${ctx.penalty}pts contexto)</span>` : '';
+
+        // Agrupar alertas por fecha de expiracion
+        const byExp = {};
+        ins.alerts.forEach(a => {
+          if (!byExp[a.expiration]) byExp[a.expiration] = [];
+          byExp[a.expiration].push(a);
+        });
+
+        const expRows = Object.entries(byExp).map(([exp, alerts]) => {
+          const strikes = alerts.map(a => `$${a.strike}`).join(', ');
+          const totalVol = alerts.reduce((s,a) => s+a.volume, 0);
+          const totalNot = alerts.reduce((s,a) => s+a.notional, 0);
+          const topReason = alerts.sort((a,b) => b.score - a.score)[0].reason;
+          const dte = alerts[0].dte;
+          return `<div class="flex items-start gap-4 text-xs py-2 border-t border-slate-800/30">
+            <div class="min-w-[140px]">
+              <div class="text-indigo-400 font-mono">${exp}</div>
+              <div class="mt-0.5">${fmtDte(dte)}</div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Apuesta</div>
+              <div class="text-indigo-300 font-bold text-sm">${fmtMoney(totalNot)}</div>
+            </div>
+            <div class="min-w-[100px]">
+              <div class="text-[10px] text-slate-500 uppercase">Strikes</div>
+              <div class="text-slate-300">${strikes}</div>
+            </div>
+            <div class="min-w-[80px]">
+              <div class="text-[10px] text-slate-500 uppercase">Volumen</div>
+              <div class="text-emerald-400">${totalVol.toLocaleString()}</div>
+            </div>
+            <div class="flex-1">
+              <div class="text-[10px] text-slate-500 uppercase">Senal</div>
+              <div class="text-slate-400">${topReason}</div>
+            </div>
+          </div>`;
+        }).join('');
+
+        return `<div class="glass glass-hover rounded-lg p-4 fade-in cursor-pointer" onclick="showTickerDetail('${ins.ticker}')">
+          <div class="flex items-center gap-3 mb-1 flex-wrap">
+            <span class="text-lg font-bold text-white">${ins.ticker}</span>
+            <span class="text-sm text-slate-400">${companyName}</span>
+            <span class="text-xs text-slate-600">@ $${ins.spot.toFixed(2)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${badgeClass}">${levelLabel}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] badge-info">Score ${maxScore.toFixed(0)}</span>${penaltyInfo}
+            ${contextBadges}
+          </div>
+          <div class="flex items-center gap-4 mb-2 text-xs">
+            <span class="text-slate-500">${ins.alerts.length} contratos inusuales</span>
+            <span class="text-slate-500">|</span>
+            <span>Apuesta total: <strong class="text-indigo-300 text-sm">${notional}</strong></span>
+          </div>
+          <div class="pl-1">${expRows}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // --- Sort & render table ---
+    function sortBy(field) {
+      if (sortField === field) sortAsc = !sortAsc;
+      else { sortField = field; sortAsc = false; }
+      renderAlerts();
+    }
+
+    function renderAlerts() {
+      const filter = (document.getElementById('filterInput').value || '').toUpperCase();
+      const filtered = filter ? allAlerts.filter(a => a.ticker.includes(filter) || (a.company||'').toUpperCase().includes(filter)) : allAlerts;
+
+      const sorted = [...filtered].sort((a,b) => {
+        const va = a[sortField], vb = b[sortField];
+        if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return sortAsc ? va - vb : vb - va;
+      });
+
+      document.getElementById('alertsBody').innerHTML = sorted.map(a => {
+        const sc = a.score >= 75 ? 'score-high' : a.score >= 50 ? 'score-med' : 'score-low';
+        const vbClass = a.vol_vs_baseline >= 5 ? 'text-red-400 font-bold' : a.vol_vs_baseline >= 3 ? 'text-amber-400' : 'text-slate-400';
+        const company = a.company || a.ticker;
+
+        return `<tr class="border-b border-slate-900/50 fade-in cursor-pointer" onclick="showTickerDetail('${a.ticker}')">
+          <td class="px-3 py-2 text-right font-bold ${sc}">${a.score.toFixed(0)}</td>
+          <td class="px-3 py-2">
+            <div class="font-bold text-white">${a.ticker}</div>
+            <div class="text-[10px] text-slate-500 truncate max-w-[160px]">${company}</div>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <div class="font-bold text-indigo-300 text-sm">${fmtMoney(a.notional)}</div>
+            <div class="text-[10px] text-slate-600">${a.volume.toLocaleString()} contratos</div>
+          </td>
+          <td class="px-3 py-2 text-center">
+            <div>${fmtDte(a.dte)}</div>
+            <div class="text-[10px] text-slate-600 font-mono">${a.expiration}</div>
+          </td>
+          <td class="px-3 py-2 text-right">${a.strike.toFixed(1)}</td>
+          <td class="px-3 py-2 text-right text-slate-500">${a.spot.toFixed(2)}</td>
+          <td class="px-3 py-2 text-right ${a.otm_pct >= 10 ? 'text-amber-400' : ''}">${a.otm_pct.toFixed(1)}%</td>
+          <td class="px-3 py-2 text-right text-emerald-400 font-medium">${a.volume.toLocaleString()}</td>
+          <td class="px-3 py-2 text-right text-slate-500">${a.open_interest.toLocaleString()}</td>
+          <td class="px-3 py-2 text-right ${a.vol_oi_ratio >= 5 ? 'text-red-400 font-bold' : ''}">${a.vol_oi_ratio.toFixed(1)}x</td>
+          <td class="px-3 py-2 text-right ${vbClass}">${a.vol_vs_baseline > 0 ? a.vol_vs_baseline.toFixed(1)+'x' : '-'}</td>
+          <td class="px-3 py-2 text-right">${a.implied_vol.toFixed(0)}%</td>
+          <td class="px-3 py-2 text-slate-500 max-w-[300px] truncate" title="${a.reason}">${a.reason}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // --- Load indices ---
+    async function loadIndices() {
+      try {
+        const res = await fetch('/api/indices');
+        const data = await res.json();
+        const sel = document.getElementById('indexSelect');
+        sel.innerHTML = data.indices.map(i =>
+          `<option value="${i.id}">${i.name} (${i.count})</option>`
+        ).join('');
+      } catch(e) {}
+    }
+
+    // --- Modal ---
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+    document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+    function showTickerDetail(ticker) {
+      const alerts = allAlerts.filter(a => a.ticker === ticker);
+      if (!alerts.length) return;
+
+      const company = alerts[0].company || ticker;
+      const spot = alerts[0].spot;
+      const totalNotional = alerts.reduce((s,a) => s + a.notional, 0);
+
+      // Build score breakdown for the top alert
+      const top = alerts.sort((a,b) => b.score - a.score)[0];
+
+      // Context info — try alert context, then fall back to insight context
+      let ctx = top.context || {};
+      // If alert has no reddit_top_posts, try to find from scanData insights
+      if ((!ctx.reddit_top_posts || !ctx.reddit_top_posts.length) && scanData && scanData.insights) {
+        const ins = (scanData.insights || []).find(i => i.ticker === ticker);
+        if (ins && ins.context) ctx = ins.context;
+      }
+      const hasReddit = ctx.reddit_mentions > 0;
+      const hasEarnings = ctx.has_earnings;
+      const redditPosts = ctx.reddit_top_posts || [];
+      const hasContext = hasReddit || hasEarnings;
+
+      let contextSection = '';
+      if (hasContext) {
+        // Earnings section
+        let earningsHtml = '';
+        if (hasEarnings && ctx.earnings_date) {
+          const daysLabel = ctx.days_to_earnings <= 3 ? 'text-red-400 font-bold' : ctx.days_to_earnings <= 7 ? 'text-amber-400 font-semibold' : 'text-purple-400';
+          earningsHtml = `
+            <div class="flex items-center gap-3 p-3 rounded bg-purple-500/5 border border-purple-500/15">
+              <div class="text-purple-400 text-lg font-bold">${ctx.days_to_earnings}d</div>
+              <div>
+                <div class="text-xs text-white font-medium">Earnings: ${ctx.earnings_date}</div>
+                <div class="text-[10px] text-slate-500">Actividad inusual pre-earnings puede ser insider trading genuino</div>
+              </div>
+            </div>`;
+        }
+
+        // Reddit section
+        let redditHtml = '';
+        if (hasReddit) {
+          const hypeLabel = ctx.reddit_hype === 'viral' ? '<span class="badge-reddit px-1.5 py-0.5 rounded text-[10px] font-semibold">VIRAL</span>'
+            : ctx.reddit_hype === 'high' ? '<span class="badge-reddit px-1.5 py-0.5 rounded text-[10px]">Trending</span>'
+            : '<span class="badge-reddit px-1.5 py-0.5 rounded text-[10px]">Mencionado</span>';
+
+          const postsHtml = redditPosts.length > 0 ? redditPosts.map(p => {
+            const timeLabel = p.created_ago || (p.created ? new Date(p.created).toLocaleDateString('es-ES', {day:'2-digit',month:'short'}) : '');
+            return `<a href="${p.url}" target="_blank" class="flex items-center gap-3 text-xs py-1.5 border-b border-slate-800/30 hover:bg-orange-500/5 transition-colors rounded px-2">
+              <span class="text-orange-400/70 min-w-[80px]">r/${p.subreddit}</span>
+              <span class="text-slate-300 flex-1 truncate">${p.title}</span>
+              <span class="text-slate-600 min-w-[45px] text-right">${p.score} pts</span>
+              <span class="text-slate-600 min-w-[40px] text-right">${p.num_comments} com</span>
+              <span class="text-slate-500 min-w-[55px] text-right">${timeLabel}</span>
+            </a>`;
+          }).join('') : '';
+
+          redditHtml = `
+            <div class="p-3 rounded bg-orange-500/5 border border-orange-500/15">
+              <div class="flex items-center gap-2 mb-2">
+                ${hypeLabel}
+                <span class="text-xs text-slate-400">${ctx.reddit_mentions} menciones esta semana</span>
+                ${ctx.penalty > 0 ? `<span class="text-[10px] text-slate-600">(-${ctx.penalty} pts al score)</span>` : ''}
+              </div>
+              ${postsHtml ? `<div class="space-y-0">${postsHtml}</div>` : '<div class="text-[10px] text-slate-600">No se encontraron posts directos con el ticker</div>'}
+            </div>`;
+        }
+
+        contextSection = `
+          <h4 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2 mt-5">Contexto publico</h4>
+          <div class="space-y-2 mb-4">
+            ${earningsHtml}
+            ${redditHtml}
+          </div>`;
+      } else {
+        contextSection = `
+          <div class="mt-3 mb-4">
+            <span class="px-2 py-1 rounded text-[10px] font-semibold badge-genuine">Sin ruido publico — Mayor probabilidad de insider genuino</span>
+          </div>`;
+      }
+
+      const content = document.getElementById('modalContent');
+      content.innerHTML = `
+        <div class="mb-4">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="text-xl font-bold text-white">${ticker}</span>
+            <span class="text-sm text-slate-400">${company}</span>
+            <span class="text-xs text-slate-600">@ $${spot.toFixed(2)}</span>
+          </div>
+          <div class="text-xs text-slate-500">${alerts.length} contratos inusuales | Notional total: <strong class="text-indigo-300">${fmtMoney(totalNotional)}</strong></div>
+          <div class="text-[10px] text-slate-600 mt-1">Escaneado: ${top.data_timestamp || top.scanned_at || ''}</div>
+        </div>
+        ${contextSection}
+
+        <h4 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2 mt-6">Desglose del score — Contrato con mayor sospecha (Score ${top.score.toFixed(0)})</h4>
+        <div class="bg-slate-800/40 rounded p-3 text-xs font-mono text-slate-300 mb-3">
+          Call $${top.strike} (${top.otm_pct.toFixed(1)}% OTM) &bull; Exp ${top.expiration} (${top.dte}d) &bull; Vol: ${top.volume.toLocaleString()} &bull; OI: ${top.open_interest.toLocaleString()} &bull; Notional: ${fmtMoney(top.notional)}
+        </div>
+        <table class="w-full text-xs mb-6">
+          <thead><tr class="text-[10px] text-slate-500 uppercase border-b border-slate-800/50">
+            <th class="px-3 py-1.5 text-left">Senal</th>
+            <th class="px-3 py-1.5 text-right">Valor</th>
+            <th class="px-3 py-1.5 text-right">Pts</th>
+            <th class="px-3 py-1.5 text-right">Peso</th>
+            <th class="px-3 py-1.5 text-right">Aporte</th>
+          </tr></thead>
+          <tbody class="text-slate-300">
+            ${scoreRow('Vol vs baseline', top.vol_vs_baseline > 0 ? top.vol_vs_baseline.toFixed(1)+'x' : '-', calcSignalPts('baseline', top), 0.25)}
+            ${scoreRow('Vol/OI (posiciones nuevas)', top.vol_oi_ratio.toFixed(1)+'x', calcSignalPts('voloi', top), 0.20)}
+            ${scoreRow('Notional', fmtMoney(top.notional), calcSignalPts('notional', top), 0.20)}
+            ${scoreRow('Expiracion', top.dte + ' dias', calcSignalPts('dte', top), 0.15)}
+            ${scoreRow('Profundidad OTM', top.otm_pct.toFixed(1)+'%', calcSignalPts('otm', top), 0.10)}
+            ${scoreRow('Clustering', top.cluster_count || alerts.length, calcSignalPts('cluster', top, alerts.length), 0.10)}
+          </tbody>
+          <tfoot><tr class="border-t border-indigo-500/30"><td colspan="4" class="px-3 py-2 text-right font-semibold text-white">SCORE TOTAL</td><td class="px-3 py-2 text-right text-lg font-bold ${top.score >= 75 ? 'score-high' : 'score-med'}">${top.score.toFixed(1)}</td></tr></tfoot>
+        </table>
+
+        <h4 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Todos los contratos de ${ticker}</h4>
+        <div class="space-y-1">
+          ${alerts.sort((a,b)=>b.score-a.score).map(a => `
+            <div class="flex items-center gap-3 text-xs py-1.5 border-b border-slate-800/30">
+              <span class="font-bold min-w-[30px] text-right ${a.score>=75?'score-high':'score-med'}">${a.score.toFixed(0)}</span>
+              <span class="text-indigo-300 font-bold min-w-[60px] text-right">${fmtMoney(a.notional)}</span>
+              <span class="min-w-[60px] text-center">${fmtDte(a.dte)}</span>
+              <span class="text-slate-400 min-w-[60px]">$${a.strike}</span>
+              <span class="text-slate-500 min-w-[50px]">${a.otm_pct.toFixed(1)}% OTM</span>
+              <span class="text-emerald-400 min-w-[60px]">${a.volume.toLocaleString()} vol</span>
+              <span class="text-slate-500 min-w-[50px]">${a.vol_oi_ratio.toFixed(1)}x V/OI</span>
+              <span class="text-slate-600 flex-1 truncate">${a.reason}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function scoreRow(label, value, pts, weight) {
+      const contrib = (pts * weight).toFixed(1);
+      return `<tr class="border-b border-slate-800/30">
+        <td class="px-3 py-1.5">${label}</td>
+        <td class="px-3 py-1.5 text-right ${pts >= 70 ? 'text-red-400' : pts >= 40 ? 'text-amber-400' : 'text-slate-400'}">${value}</td>
+        <td class="px-3 py-1.5 text-right">${pts}</td>
+        <td class="px-3 py-1.5 text-right text-slate-500">x ${weight}</td>
+        <td class="px-3 py-1.5 text-right font-bold">${contrib}</td>
+      </tr>`;
+    }
+
+    function calcSignalPts(signal, a, clusterOverride) {
+      switch(signal) {
+        case 'baseline': {
+          const vb = a.vol_vs_baseline || 0;
+          if (vb < 3) return 0;
+          return Math.min(100, Math.round((vb / 10) * 100));
+        }
+        case 'voloi': {
+          const voi = a.vol_oi_ratio;
+          if (voi < 1.5) return 0;
+          return Math.min(100, Math.round((voi / 15) * 100));
+        }
+        case 'notional': {
+          const n = a.notional;
+          if (n < 50000) return 0;
+          return Math.min(100, Math.round((n / 2000000) * 100));
+        }
+        case 'dte': {
+          const d = a.dte;
+          if (d <= 5) return 100; if (d <= 10) return 80; if (d <= 21) return 50; if (d <= 30) return 25; return 10;
+        }
+        case 'otm': {
+          const o = a.otm_pct;
+          if (o >= 15) return 100; if (o >= 8) return 70; if (o >= 3) return 40; return 10;
+        }
+        case 'cluster': {
+          const c = clusterOverride || a.cluster_count || 1;
+          if (c >= 5) return 100; if (c >= 3) return 70; if (c >= 2) return 40; return 0;
+        }
+        default: return 0;
+      }
+    }
+
+    // --- Full Scan ---
+    async function startFullScan() {
+      const btn = document.getElementById('fullScanBtn');
+      const scanBtn = document.getElementById('scanBtn');
+      const status = document.getElementById('status');
+      const threshold = document.getElementById('threshold').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Escaneando todo...';
+      btn.classList.add('opacity-50');
+      scanBtn.disabled = true;
+      scanBtn.classList.add('opacity-50');
+
+      allAlerts = [];
+      document.getElementById('emptyState').classList.add('hidden');
+      document.getElementById('insightsSection').classList.add('hidden');
+      document.getElementById('alertsSection').classList.add('hidden');
+      document.getElementById('progressSection').classList.remove('hidden');
+
+      const evtSource = new EventSource(`/api/scan/full?threshold=${threshold}&top=30`);
+
+      evtSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'progress') {
+          const pct = ((data.current / data.total) * 100).toFixed(0);
+          document.getElementById('progressBar').style.width = pct + '%';
+          document.getElementById('progressText').textContent = `${data.current}/${data.total} — ${data.ticker}`;
+          status.innerHTML = `<span class="pulse text-red-400">Full Scan ${data.current}/${data.total}</span>`;
+        }
+        else if (data.type === 'alert') {
+          allAlerts.push(data.alert);
+        }
+        else if (data.type === 'done') {
+          evtSource.close();
+          document.getElementById('progressSection').classList.add('hidden');
+
+          // Use enriched alerts from the done event
+          allAlerts = data.alerts || allAlerts;
+
+          showResults(data, allAlerts);
+
+          btn.disabled = false;
+          btn.textContent = 'Full Scan';
+          btn.classList.remove('opacity-50');
+          scanBtn.disabled = false;
+          scanBtn.classList.remove('opacity-50');
+          status.textContent = `Full Scan completado ${new Date().toLocaleTimeString('es-ES')}`;
+          loadHistory();
+        }
+      };
+
+      evtSource.onerror = () => {
+        evtSource.close();
+        document.getElementById('progressSection').classList.add('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Full Scan';
+        btn.classList.remove('opacity-50');
+        scanBtn.disabled = false;
+        scanBtn.classList.remove('opacity-50');
+        status.innerHTML = '<span class="text-red-400">Error de conexion</span>';
+      };
+    }
+
+    // --- History ---
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const sel = document.getElementById('historySelect');
+        sel.innerHTML = '<option value="">— Escaneos anteriores —</option>';
+        if (!data.length) return;
+        sel.innerHTML += data.map(h => {
+          const date = new Date(h.scan_time);
+          const dateStr = date.toLocaleDateString('es-ES', { day:'2-digit', month:'short' });
+          const timeStr = date.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+          const src = h.source.replace(/_/g, ' ');
+          const alertInfo = h.high > 0 ? `${h.high} alta` : h.total_alerts > 0 ? `${h.total_alerts} alertas` : 'Sin alertas';
+          return `<option value="${h.filename}">${dateStr} ${timeStr} — ${src} (${alertInfo})</option>`;
+        }).join('');
+      } catch(e) {}
+    }
+
+    function onHistorySelect() {
+      const sel = document.getElementById('historySelect');
+      const filename = sel.value;
+      if (filename) {
+        loadScan(filename);
+        sel.value = '';
+      }
+    }
+
+    async function loadScan(filename) {
+      const status = document.getElementById('status');
+      status.innerHTML = '<span class="pulse text-indigo-400">Cargando...</span>';
+      try {
+        const res = await fetch(`/api/history/${filename}`);
+        const data = await res.json();
+        allAlerts = data.alerts || [];
+
+        document.getElementById('emptyState').classList.add('hidden');
+
+        const summary = {
+          tickers_scanned: data.tickers_scanned,
+          tickers_with_alerts: data.tickers_with_alerts,
+          total_alerts: data.summary?.total || 0,
+          high: data.summary?.high || 0,
+          medium: data.summary?.medium || 0,
+          insights: data.insights || [],
+          scan_time: data.scan_time,
+        };
+        showResults(summary, allAlerts);
+
+        const date = new Date(data.scan_time);
+        const src = (data.source || '').replace(/_/g, ' ');
+        status.textContent = `Cargado: ${src} — ${date.toLocaleDateString('es-ES')} ${date.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'})}`;
+      } catch(e) {
+        status.innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
+      }
+    }
+
+    async function deleteScan(filename) {
+      await fetch(`/api/history/${filename}`, { method: 'DELETE' });
+      loadHistory();
+    }
+
+    // Enter to scan
+    document.getElementById('tickerInput').addEventListener('keydown', e => { if(e.key==='Enter') startScan(); });
+
+    loadWatchlist();
+    loadIndices();
+    loadHistory();
+  </script>
+</body>
+</html>
